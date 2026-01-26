@@ -1,0 +1,55 @@
+services:
+  comfyui:
+    container_name: comfyui
+    image: morgan55555/comfyui-docker:1.0.0
+    build:
+      context: ./comfyui
+      dockerfile: Dockerfile
+      args:
+        - USER_UID=1001
+        - USER_GID=1001
+        - COMFYUI_VERSION=v0.10.0
+        - TORCH_INDEX_URL=https://download.pytorch.org/whl/cu130
+    environment:
+      - COMFYUI_MANAGER=true
+      - COMFYUI_FILEBROWSER=true
+      - FILEBROWSER_URL=http://10.255.255.10:8189/
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            device_ids: ['3']
+            capabilities: [gpu]
+    volumes:
+      - comfyui_data:/comfy/base
+    ports:
+      - "8188:8188"
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "5"
+    restart: unless-stopped
+
+  filebrowser:
+    container_name: filebrowser
+    image: "filebrowser/filebrowser:s6"
+    environment:
+      - PUID=1001
+      - PGID=1001
+      - FB_NOAUTH=true
+    volumes:
+      - comfyui_data:/srv
+      - comfyui_filebrowser:/database
+    ports:
+      - "8189:80"
+    logging:
+      driver: none
+    restart: unless-stopped
+
+volumes:
+  comfyui_data:
+    name: comfyui_data
+  comfyui_filebrowser:
+    name: comfyui_filebrowser
