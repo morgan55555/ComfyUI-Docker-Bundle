@@ -14,6 +14,7 @@ services:
       - COMFYUI_MANAGER=true
       - COMFYUI_FILEBROWSER=true
       - FILEBROWSER_URL=http://10.255.255.10:8189/
+      - __COMFY_CLI_SESSION__=/tmp/comfyui
     deploy:
       resources:
         reservations:
