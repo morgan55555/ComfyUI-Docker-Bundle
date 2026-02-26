@@ -5,10 +5,13 @@ echo "##             ComfyUI Launcher script             ##"
 echo "#####################################################"
 echo
 
+# Fix for libcuda.so.1
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/x86_64-linux-gnu/
+
 # If pip venv is not created
 if [ ! -f "$VENV_DIR_DOCKER/pyvenv.cfg" ]; then
     echo "Pip venv is empty. Trying to create..."
-    python3 -m venv "$VENV_DIR_DOCKER" --system-site-packages
+    python3 -m venv "$VENV_DIR_DOCKER"
 fi
 
 # Venv is needed for python dependencies, installed by custom nodes.
@@ -27,10 +30,25 @@ done
 # Arguments handling
 final_args=("$@")
 
+# Install requirements for ComfyUI
+if [ "$(cat "$VENV_DIR_DOCKER/comfyui_version")" != "$COMFYUI_VERSION_DOCKER" ]; then
+    echo "Installing reqirements..."
+    pip uninstall torch
+    pip install torch torchvision torchaudio
+    pip install -r "$APP_DIR_DOCKER/requirements.txt"
+    echo "$COMFYUI_VERSION_DOCKER" > "$VENV_DIR_DOCKER/comfyui_version"
+fi
+
 # Install requirements for manager and set manager args
 if [[ "$COMFYUI_MANAGER" == "true" ]]; then
     echo "Manager is enabled!"
     final_args+=("--enable-manager")
+
+    if [ "$(cat "$VENV_DIR_DOCKER/comfyui_mgr")" != "$COMFYUI_VERSION_DOCKER" ]; then
+        echo "Installing reqirements..."
+        pip install -r "$APP_DIR_DOCKER/manager_requirements.txt"
+        echo "$COMFYUI_VERSION_DOCKER" > "$VENV_DIR_DOCKER/comfyui_mgr"
+    fi
 fi
 
 # Install filebrowser
@@ -55,5 +73,6 @@ mkdir -p "$BASE_DIR_DOCKER/user"
 ln -s "$BASE_DIR_DOCKER/user" "$APP_DIR_DOCKER/user"
 
 # Launch ComfyUI
+echo "LD_LIBRARY_PATH is $LD_LIBRARY_PATH"
 echo "Launching ComfyUI with arguments "${final_args[@]}"..."
 python3 "$APP_DIR_DOCKER/main.py" "${final_args[@]}"

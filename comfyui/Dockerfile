@@ -1,5 +1,7 @@
-# From lite debian image
-FROM debian:trixie-slim
+ARG BASE_IMAGE=nvidia/cuda:13.0.0-cudnn-devel-ubuntu22.04
+
+# From selected image
+FROM "$BASE_IMAGE"
 
 # Define build arguments
 ARG USER_NAME=runner
@@ -14,6 +16,10 @@ ARG VENV_DIR=$WORKING_DIR/base/.env
 ARG COMFYUI_VERSION=master
 ARG TORCH_INDEX_URL=https://download.pytorch.org/whl/cu130
 
+# Some fixes
+ENV DEBIAN_FRONTEND=noninteractive
+ENV UV_LINK_MODE=copy
+
 # Set environment variables
 ENV COMFYUI_MANAGER true
 ENV COMFYUI_FILEBROWSER true
@@ -27,12 +33,14 @@ RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
     --mount=target=/var/cache/apt,type=cache,sharing=locked \
     rm -f /etc/apt/apt.conf.d/docker-clean \
     && apt-get update \
-    && apt-get -y --no-install-recommends install \
-        git python3 python3-pip python3-venv
+    && apt-get install -y --no-install-recommends \
+        git python3 python3-pip python3-venv python3-dev libxcb1 libgl1 libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
 # Create the group and user
-RUN groupadd --gid $USER_GID $USER_NAME && \
-    useradd --uid $USER_UID --gid $USER_GID -m $USER_NAME -s /bin/bash
+RUN groupadd --gid "$USER_GID" "$USER_NAME" && \
+    useradd --uid "$USER_UID" --gid "$USER_GID" -m "$USER_NAME" -s /bin/bash
 
 # Set the working directory
 WORKDIR "$WORKING_DIR"
@@ -47,24 +55,17 @@ COPY --chown=$USER_UID:$USER_GID --chmod=0755 launch.sh ./launch.sh
 # Switch to the non-root user
 USER $USER_NAME
 
-# Install python dependencies
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip config set global.break-system-packages true \
-    && pip install torch torchvision torchaudio --index-url "$TORCH_INDEX_URL"
-
 # Clone repo
 RUN git clone https://github.com/Comfy-Org/ComfyUI.git --depth 1 --single-branch --branch "$COMFYUI_VERSION" "$APP_DIR" 
-
-# Install requirements
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip config set global.break-system-packages true \
-    && pip install -r "$APP_DIR/requirements.txt" \
-    && pip install -r "$APP_DIR/manager_requirements.txt"
 
 # Set additional environment variables from build arguments
 ENV VENV_DIR_DOCKER=${VENV_DIR}
 ENV APP_DIR_DOCKER=${APP_DIR}
 ENV BASE_DIR_DOCKER=${BASE_DIR}
+ENV COMFYUI_VERSION_DOCKER=${COMFYUI_VERSION}
+
+# Set pip index url
+RUN pip config set user.index-url "$TORCH_INDEX_URL"
 
 # Run launch script
 ENTRYPOINT ./launch.sh --listen 0.0.0.0 --port 8188 --disable-auto-launch --base-directory "$BASE_DIR_DOCKER"

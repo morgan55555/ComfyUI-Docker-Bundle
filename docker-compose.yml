@@ -6,6 +6,7 @@ services:
       context: ./comfyui
       dockerfile: Dockerfile
       args:
+        - BASE_IMAGE=nvidia/cuda:13.0.0-cudnn-devel-ubuntu22.04
         - USER_UID=1001
         - USER_GID=1001
         - COMFYUI_VERSION=v0.10.0
